@@ -85,13 +85,30 @@ def wx_history_json(chat: str, *, limit: int, since: str | None, until: str | No
     args = ["history", chat, "-n", str(limit), "--json"]
     if since: args += ["--since", since]
     if until:
-        # wx-cli 的 --until 是开区间(不含当天). 我们对外语义改成闭区间 → 自动 +1
+        # wx-cli 的 --until 是开区间(不含当天). 对外语义改成闭区间 → 自动 +1
         try:
             d = dt.datetime.strptime(until, "%Y-%m-%d")
             until_inclusive = (d + dt.timedelta(days=1)).strftime("%Y-%m-%d")
             args += ["--until", until_inclusive]
         except ValueError:
             args += ["--until", until]
+
+    # 第一次尝试: 直接查
+    try:
+        out = wx_run(args).strip()
+        if not out: return []
+        return json.loads(out)
+    except RuntimeError as e:
+        if "找不到" not in str(e):
+            raise
+        # wx daemon 缓存可能掉了, 先 "热身" 一下不带日期再重试
+        print(f"  ⚠️  daemon 缓存可能掉了, 热身重试...")
+        try:
+            wx_run(["history", chat, "-n", "5", "--json"])
+        except Exception:
+            pass  # 热身失败也继续, 让真正的重试报错
+
+    # 第二次尝试
     out = wx_run(args).strip()
     if not out: return []
     return json.loads(out)
@@ -235,7 +252,19 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
 
-    # === 1) 调 wx history ===
+    # === 0) 热身 wx daemon: 先 members(群) 再 history(无日期), 避免 daemon 冷启动报 "找不到记录" ===
+    is_group = "@chatroom" in args.chat
+    if is_group:
+        try:
+            wx_run(["members", args.chat, "--json"])
+        except Exception:
+            pass
+    try:
+        wx_run(["history", args.chat, "-n", "1", "--json"])
+    except Exception:
+        pass
+
+    # === 1) 调 wx history (真正取数) ===
     print(f"📥 wx history {args.chat} (limit={args.limit}, since={args.since}, until={args.until})")
     messages = wx_history_json(args.chat, limit=args.limit, since=args.since, until=args.until)
     print(f"   ✓ 拿到 {len(messages)} 条消息")
@@ -243,8 +272,7 @@ def main(argv=None):
         print("⚠️  没消息, 退出")
         return 3
 
-    # === 2) 判定群聊还是私聊 ===
-    is_group = "@chatroom" in args.chat
+    # === 2) 判定群聊还是私聊 (上面已用了, 这里仅保留逻辑顺序) ===
 
     # === 3) 拉群成员 (并发 wxid → display 映射) ===
     members: list[dict] = []
