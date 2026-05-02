@@ -225,7 +225,7 @@ def parse_args(argv=None):
     p.add_argument("chat", help="会话 ID(50341992009@chatroom 或 wxid_xxx) 或精确显示名")
     p.add_argument("--since", help="YYYY-MM-DD")
     p.add_argument("--until", help="YYYY-MM-DD")
-    p.add_argument("--limit", type=int, default=50000, help="最多拉多少条 (default: 50000)")
+    p.add_argument("--limit", type=int, default=5000, help="最多拉多少条 (default: 5000, wx-cli 大 limit 会卡)")
     p.add_argument("--no-render", action="store_true", help="只生成 cache JSON, 不调 render.py")
     p.add_argument("--out", help="自定义输出路径(默认 .claudian/wechat/cache/)")
     p.add_argument("--secrets", default=None)
