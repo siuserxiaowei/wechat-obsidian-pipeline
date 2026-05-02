@@ -1,0 +1,107 @@
+{
+  "type": "object",
+  "required": ["story_sections", "ranking_top3", "daily_awards"],
+  "properties": {
+    "header_emoji": { "type": "string" },
+    "quick_quotes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "quote"],
+        "properties": {
+          "name": { "type": "string" },
+          "quote": { "type": "string" }
+        }
+      }
+    },
+    "ranking_top3": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["name", "count"],
+        "properties": {
+          "medal": { "type": "string" },
+          "name": { "type": "string" },
+          "count": { "type": "integer" },
+          "common_words": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "sharer": { "type": "string" },
+          "time": { "type": "string" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "url": { "type": "string" },
+          "key_points": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "story_sections": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["title", "messages"],
+        "properties": {
+          "emoji": { "type": "string" },
+          "title": { "type": "string" },
+          "time_range": { "type": "string" },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "content"],
+              "properties": {
+                "name": { "type": "string" },
+                "time": { "type": "string" },
+                "content": { "type": "string" }
+              }
+            }
+          },
+          "commentary": { "type": "string" }
+        }
+      }
+    },
+    "echo_quote": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "voicers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "count": { "type": "integer" }
+      }
+    },
+    "daily_awards": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["award", "winner"],
+        "properties": {
+          "award": { "type": "string" },
+          "winner": { "type": "string" },
+          "reason": { "type": "string" },
+          "quote": { "type": "string" }
+        }
+      }
+    }
+  }
+}
