@@ -11,7 +11,7 @@
 # 用法:
 #   daily_report.sh                        # 默认跑昨天
 #   daily_report.sh 2026-04-30             # 指定日期
-#   daily_report.sh 2026-05-01 49192810916@chatroom  # 单群
+#   daily_report.sh 2026-05-01 1234567890@chatroom  # 单群
 #
 # 由 launchd 每天 08:00 触发
 # Logs: .claudian/wechat/logs/daily-report-YYYYMMDD.log
