@@ -70,6 +70,11 @@ if ! command -v claude >/dev/null 2>&1; then
   echo "❌ claude CLI 不在 PATH"; exit 2
 fi
 
+# === wx-cli daemon warmup ===
+# 批量场景里 daemon 缓存会被挤爆, 必须先 sessions 全扫一遍 prime cache
+echo "🔥 wx daemon warmup (sessions -n 2000)..."
+wx sessions -n 2000 --json >/dev/null 2>&1 || echo "  (warmup 失败也没关系, 后面失败会自动重试)"
+
 # === 跑一个群的全流程 ===
 process_group() {
   local talker="$1"
@@ -246,4 +251,31 @@ echo ""
 echo "════════════════════════════════════════════"
 echo "🏁 $(date '+%H:%M:%S')  成功 $SUCCESS / 失败 $FAIL / 跳过 $SKIP"
 echo "════════════════════════════════════════════"
+
+# === 发布到 GitHub Pages (<your-username>.github.io/qun-riba) ===
+if [ -z "${SKIP_PUBLISH:-}" ]; then
+  echo ""
+  echo "════════════════════════════════════════════"
+  echo "📤 发布到 GitHub Pages..."
+  echo "════════════════════════════════════════════"
+
+  PAGES_DIR="${PAGES_DIR:-/tmp/qun-riba-pages}"
+  if [ ! -d "$PAGES_DIR/.git" ]; then
+    echo "  📦 clone qun-riba 仓库..."
+    git clone https://github.com/<your-username>/qun-riba.git "$PAGES_DIR" 2>&1 | tail -2
+  else
+    echo "  🔄 pull 最新..."
+    (cd "$PAGES_DIR" && git pull --rebase origin main 2>&1 | tail -2)
+  fi
+
+  "$SKILL_DIR/.venv/bin/python" "$WECHAT_ROOT/bin/publish_daily.py" \
+    --date "$TARGET_DATE" \
+    --vault "$VAULT" \
+    --pages-dir "$PAGES_DIR" \
+    --push 2>&1 | tail -10
+
+  echo ""
+  echo "🌐 https://<your-username>.github.io/qun-riba/${TARGET_DATE//-/}/"
+fi
+
 exit 0

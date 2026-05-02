@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>群日报 · {{ date }}</title>
+<style>
+  :root {
+    --bg: #FAFAFA;
+    --card: #FFFFFF;
+    --bubble: #F2F2F2;
+    --text: #1A1A1A;
+    --muted: #888888;
+    --line: #E8E8E8;
+    --accent: #07C160;
+    --accent-soft: #E6F7EE;
+    --warn: #FA5151;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--text);
+    scroll-behavior: smooth;
+  }
+
+  /* === 顶部 Hero === */
+  .hero {
+    text-align: center;
+    padding: 40px 16px 24px;
+    background: linear-gradient(180deg, #FFF8E0 0%, #FFFFFF 100%);
+    border-bottom: 1px solid var(--line);
+  }
+  .hero .dragon { font-size: 56px; line-height: 1; }
+  .hero h1 {
+    margin: 10px 0 6px;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+  .hero .date {
+    font-size: 14px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .hero .stats {
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .hero .stats span {
+    margin: 0 8px;
+    color: var(--accent);
+    font-weight: 700;
+    font-feature-settings: "tnum";
+  }
+
+  /* === 顶部导航 (sticky) === */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    padding: 12px 16px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .nav a {
+    display: inline-block;
+    padding: 6px 12px;
+    margin-right: 6px;
+    background: var(--bubble);
+    color: var(--text);
+    border-radius: 999px;
+    font-size: 12px;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .nav a:hover, .nav a.active {
+    background: var(--accent);
+    color: #FFF;
+  }
+  .nav a.skipped { opacity: 0.4; }
+
+  /* === 主内容 === */
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 16px 60px;
+  }
+
+  /* === 群分隔卡 === */
+  .group {
+    margin: 32px 0;
+    padding: 24px 20px;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+  }
+  .group-head {
+    text-align: center;
+    padding-bottom: 18px;
+    border-bottom: 2px dashed var(--line);
+    margin-bottom: 18px;
+  }
+  .group-head .name {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .group-head .meta {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .group-head .meta span {
+    margin: 0 4px;
+    font-feature-settings: "tnum";
+  }
+
+  /* === 段标题 === */
+  .section-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 18px 0 10px;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .section-title .emoji { font-size: 18px; }
+  .section-title .sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: 6px;
+  }
+
+  /* === 快捷事件 === */
+  .quotes {
+    background: var(--bubble);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .quotes .row {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+  }
+  .quotes .row:last-child { border-bottom: none; }
+  .quotes .who {
+    flex: 0 0 auto;
+    min-width: 80px;
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 13px;
+  }
+  .quotes .quote { flex: 1; font-size: 13px; }
+
+  /* === 龙王榜 === */
+  .ranking { display: flex; gap: 8px; margin-bottom: 14px; }
+  .ranking .seat {
+    flex: 1;
+    text-align: center;
+    padding: 14px 8px 10px;
+    background: var(--bubble);
+    border-radius: 12px;
+  }
+  .seat.gold   { background: linear-gradient(180deg,#FFFAEC,#FAFAFA); }
+  .seat.silver { background: linear-gradient(180deg,#F4F4F8,#FAFAFA); }
+  .seat.bronze { background: linear-gradient(180deg,#FBF1E6,#FAFAFA); }
+  .seat .medal { font-size: 28px; line-height: 1; }
+  .seat .name {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    word-break: break-all;
+  }
+  .seat .cnt {
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--muted);
+    font-feature-settings: "tnum";
+  }
+  .seat .common {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.4;
+    word-break: break-all;
+  }
+
+  /* === 资源 === */
+  .resources .res {
+    background: var(--bubble);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+  .res .meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .res .title { font-size: 13px; font-weight: 600; line-height: 1.4; }
+  .res .desc { font-size: 12px; color: #555; margin-top: 4px; line-height: 1.5; }
+  .res .points { margin: 6px 0 0; padding-left: 18px; font-size: 11px; color: #666; }
+  .res .points li { margin: 2px 0; }
+  .res .url { margin-top: 6px; font-size: 11px; color: var(--accent); word-break: break-all; }
+
+  /* === 故事章节 === */
+  .story {
+    background: var(--bubble);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .story-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed rgba(0,0,0,0.08);
+  }
+  .story-head .emoji { font-size: 18px; }
+  .story-head .title { font-size: 15px; font-weight: 700; }
+  .story-head .meta { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .bubble {
+    margin: 7px 0;
+  }
+  .bubble .who {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .bubble .who .time { margin-left: 6px; color: #BBB; font-feature-settings: "tnum"; }
+  .bubble .body {
+    background: #FFF;
+    border-radius: 4px 14px 14px 14px;
+    padding: 8px 12px;
+    font-size: 13px;
+    line-height: 1.55;
+    word-break: break-word;
+  }
+  .commentary {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--accent-soft);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #1F5F3D;
+    line-height: 1.6;
+    border-left: 3px solid var(--accent);
+  }
+  .commentary::before {
+    content: "✏️ 毒舌点评 ";
+    font-weight: 700;
+    margin-right: 4px;
+  }
+
+  /* === 复读 === */
+  .echo {
+    text-align: center;
+    background: var(--bubble);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .echo .quote {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--accent);
+  }
+  .echo .voicers { font-size: 11px; color: var(--muted); }
+
+  /* === 词云 === */
+  .cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    margin-bottom: 14px;
+  }
+  .cloud .chip {
+    padding: 3px 9px;
+    background: var(--bubble);
+    border-radius: 999px;
+    font-size: 11px;
+    color: #555;
+  }
+  .cloud .chip.hot { background: #FFE4E6; color: var(--warn); font-weight: 700; }
+
+  /* === 颁奖 === */
+  .awards .row {
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--bubble);
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .awards .label {
+    flex: 0 0 80px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .awards .winner {
+    flex: 0 0 auto;
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 13px;
+    margin-right: 10px;
+    word-break: break-all;
+  }
+  .awards .reason {
+    flex: 1;
+    font-size: 12px;
+    color: #555;
+    line-height: 1.5;
+  }
+
+  /* === 群被跳过 (薄数据) === */
+  .group.skipped {
+    opacity: 0.55;
+  }
+  .group.skipped .group-head .name::after {
+    content: " · 今天比较安静";
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .skip-msg {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 30px 10px;
+    line-height: 1.7;
+  }
+
+  /* === 底部 === */
+  footer {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--muted);
+    font-size: 12px;
+    border-top: 1px solid var(--line);
+    margin-top: 40px;
+    line-height: 1.7;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  /* === Tablet/Desktop === */
+  @media (min-width: 720px) {
+    .container { padding: 0 24px 80px; }
+    .group { padding: 30px 28px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="dragon">🐉</div>
+  <h1>群日报</h1>
+  <div class="date">{{ date }} · {{ weekday }}</div>
+  <div class="stats">
+    覆盖 <span>{{ groups | length }}</span> 个群 ·
+    总消息 <span>{{ total_messages }}</span> 条 ·
+    活跃用户 <span>{{ total_active_users }}</span> 人
+  </div>
+</div>
+
+<div class="nav">
+  {% for g in groups %}
+  <a href="#{{ g.anchor }}" class="{% if g.skipped %}skipped{% endif %}">{{ g.name }}{% if g.message_count %} · {{ g.message_count }}{% endif %}</a>
+  {% endfor %}
+</div>
+
+<div class="container">
+
+  {% for g in groups %}
+  <div class="group {% if g.skipped %}skipped{% endif %}" id="{{ g.anchor }}">
+    <div class="group-head">
+      <div class="name">{{ g.name }}</div>
+      <div class="meta">
+        {% if g.skipped %}
+          <span>当天 {{ g.message_count }} 条</span>
+        {% else %}
+          <span>{{ g.message_count }} 条消息</span> ·
+          <span>{{ g.active_users }} 人</span> ·
+          <span>{{ g.time_range }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if g.skipped %}
+      <div class="skip-msg">
+        💤 当天群里只有 {{ g.message_count }} 条消息，少于阈值，跳过日报生成
+      </div>
+    {% else %}
+
+      {# 快捷事件 #}
+      {% if g.ai.quick_quotes %}
+      <div class="section-title"><span class="emoji">🔥</span><span>快捷事件</span><span class="sub">今天群里说了啥</span></div>
+      <div class="quotes">
+        {% for q in g.ai.quick_quotes %}
+        <div class="row">
+          <div class="who">{{ q.name }}</div>
+          <div class="quote">{{ q.quote }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# 龙王榜 #}
+      {% if g.ai.ranking_top3 %}
+      <div class="section-title"><span class="emoji">🏆</span><span>龙王榜</span><span class="sub">话痨 TOP 3</span></div>
+      <div class="ranking">
+        {% for r in g.ai.ranking_top3 %}
+        <div class="seat {{ ['gold','silver','bronze'][loop.index0] if loop.index0 < 3 else '' }}">
+          <div class="medal">{{ r.medal or ['🥇','🥈','🥉'][loop.index0] }}</div>
+          <div class="name">{{ r.name }}</div>
+          <div class="cnt">{{ r.count }} 条</div>
+          {% if r.common_words %}<div class="common">{{ r.common_words | join(' / ') }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# 资源 #}
+      {% if g.ai.resources %}
+      <div class="section-title"><span class="emoji">🔗</span><span>资源分享</span></div>
+      <div class="resources">
+        {% for r in g.ai.resources %}
+        <div class="res">
+          <div class="meta">{{ r.sharer }} · {{ r.time }} · <em>{{ r.type or '资源' }}</em></div>
+          <div class="title">{{ r.title }}</div>
+          {% if r.description %}<div class="desc">{{ r.description }}</div>{% endif %}
+          {% if r.url %}<div class="url">{{ r.url }}</div>{% endif %}
+          {% if r.key_points %}
+          <ul class="points">
+            {% for p in r.key_points %}<li>{{ p }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# 故事章节 #}
+      {% for s in g.ai.story_sections %}
+      <div class="story">
+        <div class="story-head">
+          <span class="emoji">{{ s.emoji or "💬" }}</span>
+          <span class="title">{{ s.title }}</span>
+          {% if s.time_range %}<span class="meta">{{ s.time_range }}</span>{% endif %}
+        </div>
+        {% for m in s.messages %}
+        <div class="bubble">
+          <div class="who">{{ m.name }}{% if m.time %}<span class="time">{{ m.time }}</span>{% endif %}</div>
+          <div class="body">{{ m.content }}</div>
+        </div>
+        {% endfor %}
+        {% if s.commentary %}<div class="commentary">{{ s.commentary }}</div>{% endif %}
+      </div>
+      {% endfor %}
+
+      {# 群体复读 #}
+      {% if g.ai.echo_quote and g.ai.echo_quote.text %}
+      <div class="section-title"><span class="emoji">💪</span><span>群体复读</span></div>
+      <div class="echo">
+        <div class="quote">「{{ g.ai.echo_quote.text }}」</div>
+        <div class="voicers">{{ g.ai.echo_quote.voicers | join(' · ') }}{% if g.ai.echo_quote.count %} · {{ g.ai.echo_quote.count }} 人接力{% endif %}</div>
+      </div>
+      {% endif %}
+
+      {# 词云 #}
+      {% if g.word_cloud %}
+      <div class="section-title"><span class="emoji">☁️</span><span>关键词</span></div>
+      <div class="cloud">
+        {% for w in g.word_cloud[:25] %}
+        <span class="chip {% if w.count >= g.top_word_threshold %}hot{% endif %}">{{ w.text }}<small>·{{ w.count }}</small></span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# 颁奖 #}
+      {% if g.ai.daily_awards %}
+      <div class="section-title"><span class="emoji">📊</span><span>今日总结</span></div>
+      <div class="awards">
+        {% for a in g.ai.daily_awards %}
+        <div class="row">
+          <div class="label">{{ a.award }}</div>
+          <div class="winner">{{ a.winner }}</div>
+          <div class="reason">{{ a.reason or a.quote or "" }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    {% endif %}
+  </div>
+  {% endfor %}
+
+</div>
+
+<footer>
+  生成于 {{ generated_at }} · 数据源 wx-cli + Claude<br>
+  <a href="../">← 回到日历</a> ·
+  <a href="https://github.com/siuserxiaowei/wechat-obsidian-pipeline">源码</a><br>
+  by Claudian × Obsidian
+</footer>
+
+<script>
+  // 高亮当前 nav
+  const sections = document.querySelectorAll('.group');
+  const navLinks = document.querySelectorAll('.nav a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === `#${id}`));
+      }
+    });
+  }, { rootMargin: '-30% 0px -65% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
