@@ -1,8 +1,21 @@
 # wechat-obsidian-pipeline
 
-> 把微信聊天记录自动接进 Obsidian vault, 每天早上 8 点出群聊日报长图.
+> 把微信聊天记录自动接进 Obsidian vault, 每天早上 8 点出**社群日报长图**(Simon Lin 风格).
 
-一套连接微信本地数据 ↔ Obsidian vault 的流水线工具. 支持两条独立的取数路径 ([wx-cli](https://github.com/jackwener/wx-cli) 和 [WeFlow](https://github.com/hicccc77/WeFlow)), 自动渲染成 Obsidian 友好的 Markdown 时间线, 并配合 [wechat-daily-report-skill](https://github.com/ADVISORYDZ/wechat-daily-report-skill) 出每日 PNG 长图报告. 通过 macOS launchd 定时调度, 出来的报告 + AI 摘要直接归档到 vault, 可在 Obsidian 内全文搜索 / Dataview 查询 / 反链.
+一套连接微信本地数据 ↔ Obsidian vault 的流水线工具. 支持两条独立的取数路径 ([wx-cli](https://github.com/jackwener/wx-cli) 和 [WeFlow](https://github.com/hicccc77/WeFlow)), 自动渲染成 Obsidian 友好的 Markdown 时间线, 并出每日 PNG 长图报告. 通过 macOS launchd 定时调度, 出来的报告 + AI 摘要直接归档到 vault, 可在 Obsidian 内全文搜索 / Dataview 查询 / 反链.
+
+## 🎨 长图风格
+
+参考 [SimonLin 社群日报](https://simonlin000.github.io/qun-riba-20260430/) 的设计:
+
+- 🐉 头部品牌 + 日期 + 群名
+- 🔥 **快捷事件** — 当日金句速览
+- 🏆 **龙王榜** — TOP 3 话痨(带 🥇🥈🥉 奖牌 + 高频词)
+- 🔗 **资源分享** — 工具/教程/链接卡片
+- 多个 **故事章节** — 每段一个 emoji + 情境化标题(如 `💼 OPC创业大辩论` / `🐷 养殖业吐槽`)+ 对话气泡 + ✏️ **毒舌点评**
+- 💪 **群体复读** — 当天被复读的金句
+- ☁️ **关键词云** — 当日高频词 chips
+- 📊 **今日总结** — 颁奖区(最卷/最清醒/最扎心/最佳黑马/今日金句)
 
 ## ✨ 它做的事
 
