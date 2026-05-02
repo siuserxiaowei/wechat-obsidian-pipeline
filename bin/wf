@@ -1,0 +1,344 @@
+#!/usr/bin/env bash
+# wf — WeFlow API CLI
+# https://github.com/hicccc77/WeFlow
+#
+# 用法:
+#   wf health                       健康检查
+#   wf sessions [keyword]           列出所有会话 (可选关键词过滤)
+#   wf messages <talker> [opts]     拉某会话消息
+#                                   opts: --start YYYYMMDD --end YYYYMMDD --limit N --keyword X --media
+#   wf members <chatroomId>         群成员列表(含发言数)
+#   wf moments [limit]              朋友圈时间线
+#   wf sync <talker> [opts]         WeFlow 路径: 拉取 → 渲染 → 写入 vault
+#   wf wxsync <chat_id> [opts]      ★推荐★ wx-cli 路径: 拉取 → 渲染 → 写入 vault
+#                                   --since YYYY-MM-DD --until YYYY-MM-DD --limit N
+#   wf report <talker> --date D     生成日报 stats(供 Claude 接手做 ai_content + PNG)
+#   wf raw <path> [params...]       直接调用任意 API 端点 (调试用)
+#
+# 输出: 默认人类可读, --json 切到原始 JSON
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WECHAT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+VAULT_ROOT="$(cd "$WECHAT_ROOT/../.." && pwd)"
+SECRETS="$WECHAT_ROOT/secrets.json"
+
+if [[ ! -f "$SECRETS" ]]; then
+  echo "❌ 没找到 $SECRETS" >&2
+  echo "   请复制 config.example.json → secrets.json, 然后填入 Token" >&2
+  exit 1
+fi
+
+ENDPOINT=$(jq -r '.endpoint' "$SECRETS")
+TOKEN=$(jq -r '.token' "$SECRETS")
+
+CURL_OPTS=(-sS --max-time 90)
+AUTH_HEADER="Authorization: Bearer $TOKEN"
+
+_warn_token_missing() {
+  if [[ "$TOKEN" == "REPLACE_WITH_TOKEN_FROM_WEFLOW_SETTINGS" || -z "$TOKEN" || "$TOKEN" == "null" ]]; then
+    echo "⚠️  Token 还没填. 打开 WeFlow → 设置 → API 服务 → 启用 → 复制 Token 粘到:" >&2
+    echo "    $SECRETS" >&2
+    return 1
+  fi
+  return 0
+}
+
+# === 工具函数 ===
+
+_get() {
+  local path=$1; shift
+  curl "${CURL_OPTS[@]}" -H "$AUTH_HEADER" "$ENDPOINT$path" "$@"
+}
+
+_ts_yyyymmdd() {
+  # YYYYMMDD → 秒级时间戳 (BSD date 兼容 macOS)
+  date -j -f "%Y%m%d" "$1" "+%s" 2>/dev/null
+}
+
+_human_ts() {
+  date -r "$1" "+%Y-%m-%d %H:%M" 2>/dev/null
+}
+
+_die_if_no_api() {
+  _warn_token_missing || true
+  local code
+  # WeFlow 在繁忙时 health 也会慢, 给 10 秒缓冲
+  code=$(curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "$ENDPOINT/health" 2>/dev/null) || code=""
+  if [[ "$code" != "200" ]]; then
+    echo "❌ 连不上 WeFlow API ($ENDPOINT) [http=${code:-超时}]" >&2
+    echo "   • 确认 WeFlow 已打开" >&2
+    echo "   • 设置 → API 服务 → 启动" >&2
+    echo "   • Token 是否正确" >&2
+    echo "   • 如果 API 刚启动可能要等几秒, 重试" >&2
+    exit 2
+  fi
+}
+
+# === 命令实现 ===
+
+cmd_health() {
+  local code
+  code=$(curl -sS --max-time 3 -o /dev/null -w "%{http_code}" "$ENDPOINT/health" 2>/dev/null) || code=""
+  if [[ "$code" != "200" ]]; then
+    echo "❌ 不可达: $ENDPOINT [http=${code:-连接失败}]"
+    echo "   WeFlow 未开 / API 服务未启用 / 端口被占"
+    return 1
+  fi
+  echo "✅ $ENDPOINT 在线"
+  if ! _warn_token_missing; then
+    echo "   (但 Token 没填, 后续 /api/v1/* 会 401)"
+    return 0
+  fi
+  local resp
+  resp=$(_get /api/v1/health 2>/dev/null || echo '{}')
+  echo "   $resp"
+}
+
+cmd_sessions() {
+  _die_if_no_api
+  local keyword=""
+  local json_out=0
+  local raw_format=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json) json_out=1; shift;;
+      --chatlab) raw_format="format=chatlab"; shift;;
+      *) keyword="$1"; shift;;
+    esac
+  done
+  local q="limit=2000"
+  [[ -n "$keyword" ]] && q="$q&keyword=$(printf '%s' "$keyword" | jq -sRr @uri)"
+  [[ -n "$raw_format" ]] && q="$q&$raw_format"
+
+  local resp
+  resp=$(_get "/api/v1/sessions?$q")
+
+  if [[ "$json_out" == "1" ]]; then
+    echo "$resp" | jq .
+    return
+  fi
+
+  local count
+  count=$(echo "$resp" | jq -r '.count // (.sessions | length)')
+  echo "📋 共 $count 个会话"
+  echo ""
+  echo "$resp" | jq -r '
+    (.sessions // [])[] |
+    [
+      (.lastTimestamp // .lastMessageAt // 0 | tostring),
+      (.username // .id),
+      (.displayName // .name),
+      ((.unreadCount // 0) | tostring)
+    ] | @tsv
+  ' | sort -k1,1nr | awk -F'\t' 'BEGIN{
+      printf "%-17s %-4s %-32s %-32s %s\n", "最后时间", "类型", "ID", "显示名", "未读"
+      printf "%-17s %-4s %-32s %-32s %s\n", "-----------------", "----", "--------------------------------", "--------------------------------", "----"
+    } {
+      ts = $1
+      cmd = "date -r " ts " \"+%Y-%m-%d %H:%M\""
+      cmd | getline tstr; close(cmd)
+      # WeFlow API 的 type 字段恒为 0, 用 username 后缀判断
+      typestr = (index($2, "@chatroom") > 0) ? "群聊" : "私聊"
+      # 截断过长的显示名/ID
+      id = (length($2) > 30) ? substr($2, 1, 28) "…" : $2
+      name = (length($3) > 30) ? substr($3, 1, 28) "…" : $3
+      printf "%-17s %-4s %-32s %-32s %s\n", tstr, typestr, id, name, $4
+    }'
+}
+
+cmd_messages() {
+  _die_if_no_api
+  local talker="" start="" end="" limit="" keyword="" media=0 json_out=0 chatlab=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --start) start="$2"; shift 2;;
+      --end)   end="$2"; shift 2;;
+      --limit) limit="$2"; shift 2;;
+      --keyword) keyword="$2"; shift 2;;
+      --media) media=1; shift;;
+      --chatlab) chatlab=1; shift;;
+      --json) json_out=1; shift;;
+      *) [[ -z "$talker" ]] && talker="$1" || true; shift;;
+    esac
+  done
+
+  if [[ -z "$talker" ]]; then
+    echo "用法: wf messages <talker> [--start YYYYMMDD] [--end YYYYMMDD] [--limit N] [--keyword X] [--media] [--chatlab] [--json]" >&2
+    return 1
+  fi
+
+  local q="talker=$(printf '%s' "$talker" | jq -sRr @uri)"
+  [[ -n "$start" ]]   && q="$q&start=$start"
+  [[ -n "$end" ]]     && q="$q&end=$end"
+  [[ -n "$limit" ]]   && q="$q&limit=$limit"
+  [[ -n "$keyword" ]] && q="$q&keyword=$(printf '%s' "$keyword" | jq -sRr @uri)"
+  [[ "$media" == "1" ]]   && q="$q&media=1&image=1&voice=1&video=1&emoji=1"
+  [[ "$chatlab" == "1" ]] && q="$q&chatlab=1"
+
+  local resp
+  resp=$(_get "/api/v1/messages?$q")
+
+  if [[ "$json_out" == "1" ]]; then
+    echo "$resp" | jq .
+    return
+  fi
+
+  local count
+  count=$(echo "$resp" | jq -r '.count')
+  local has_more
+  has_more=$(echo "$resp" | jq -r '.hasMore')
+  echo "💬 $talker — $count 条消息${has_more:+ (还有更多: $has_more)}"
+  echo ""
+  echo "$resp" | jq -r '.messages[] | "[\(.createTime | strftime("%m-%d %H:%M"))] \(.senderUsername // "?"): \(.content // "[空]" | gsub("\n"; " "))"' | head -200
+}
+
+cmd_members() {
+  _die_if_no_api
+  local chatroom="$1"
+  if [[ -z "$chatroom" ]]; then
+    echo "用法: wf members <chatroomId>" >&2
+    return 1
+  fi
+  shift
+  local json_out=0
+  for a in "$@"; do
+    [[ "$a" == "--json" ]] && json_out=1
+  done
+  local resp
+  resp=$(_get "/api/v1/group-members?chatroomId=$(printf '%s' "$chatroom" | jq -sRr @uri)&includeMessageCounts=1")
+  if [[ "$json_out" == "1" ]]; then
+    echo "$resp" | jq .; return
+  fi
+  local count
+  count=$(echo "$resp" | jq -r '.count')
+  echo "👥 群成员: $count 人"
+  echo ""
+  echo "$resp" | jq -r '.members[] | [(.messageCount // 0 | tostring), .displayName, .groupNickname, .wxid] | @tsv' \
+    | sort -k1,1nr \
+    | awk -F'\t' 'BEGIN{printf "%-6s %-20s %-20s %s\n","发言","显示名","群昵称","wxid"} {printf "%-6s %-20s %-20s %s\n",$1,$2,$3,$4}'
+}
+
+cmd_moments() {
+  _die_if_no_api
+  local limit="${1:-20}"
+  _get "/api/v1/sns/timeline?limit=$limit&media=1&replace=1" | jq .
+}
+
+cmd_sync() {
+  _die_if_no_api
+  local talker="" start="" end="" limit="10000" media=1 dry=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --start) start="$2"; shift 2;;
+      --end)   end="$2"; shift 2;;
+      --limit) limit="$2"; shift 2;;
+      --no-media) media=0; shift;;
+      --dry-run) dry=1; shift;;
+      *) [[ -z "$talker" ]] && talker="$1" || true; shift;;
+    esac
+  done
+  if [[ -z "$talker" ]]; then
+    echo "用法: wf sync <talker> [--start YYYYMMDD] [--end YYYYMMDD] [--limit N] [--no-media] [--dry-run]" >&2
+    return 1
+  fi
+
+  local q="talker=$(printf '%s' "$talker" | jq -sRr @uri)&limit=$limit&chatlab=1"
+  [[ -n "$start" ]] && q="$q&start=$start"
+  [[ -n "$end" ]]   && q="$q&end=$end"
+  [[ "$media" == "1" ]] && q="$q&media=1&image=1&voice=1&video=0&emoji=0"
+
+  local cache_dir="$WECHAT_ROOT/cache"
+  mkdir -p "$cache_dir"
+  local snapshot="$cache_dir/$(echo "$talker" | tr '/@' '__')-$(date +%s).json"
+  echo "📥 拉取中..."
+  _get "/api/v1/messages?$q" > "$snapshot"
+
+  local count
+  count=$(jq -r '.messages | length' "$snapshot")
+  echo "  ✓ 拿到 $count 条消息 → $snapshot"
+
+  if [[ "$dry" == "1" ]]; then
+    echo "  (--dry-run, 跳过渲染)"
+    return
+  fi
+
+  echo "📝 渲染为 Markdown..."
+  python3 "$WECHAT_ROOT/bin/render.py" "$snapshot" --vault "$VAULT_ROOT" --secrets "$SECRETS"
+}
+
+cmd_raw() {
+  _die_if_no_api
+  local path="$1"; shift
+  local q=""
+  for kv in "$@"; do
+    [[ -z "$q" ]] && q="?$kv" || q="$q&$kv"
+  done
+  _get "${path}${q}" | jq .
+}
+
+cmd_wxsync() {
+  # 通过 jackwener/wx-cli 拉取数据(更稳, 不依赖 WeFlow 在跑)
+  if ! command -v wx >/dev/null 2>&1; then
+    echo "❌ 没装 wx-cli. 跑: npm install -g @jackwener/wx-cli && sudo wx init" >&2
+    return 1
+  fi
+  local args=("$WECHAT_ROOT/bin/wx_sync.py" "$@" "--secrets" "$SECRETS")
+  python3 "${args[@]}"
+}
+
+cmd_report() {
+  # 跑 wechat-daily-report skill 的第一阶段(stats + simplified_chat)
+  # 之后由 Claude 接手生成 ai_content.json + 渲染 PNG
+  local talker="" date_str="" auto_sync=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --date) date_str="$2"; shift 2;;
+      --auto-sync) auto_sync=1; shift;;
+      *) [[ -z "$talker" ]] && talker="$1" || true; shift;;
+    esac
+  done
+  if [[ -z "$talker" ]]; then
+    echo "用法: wf report <talker> [--date YYYY-MM-DD] [--auto-sync]" >&2
+    echo "" >&2
+    echo "示例:" >&2
+    echo "  wf report 49192810916@chatroom --date 2026-05-01" >&2
+    echo "  wf report 49192810916@chatroom --auto-sync           # 默认今天" >&2
+    return 1
+  fi
+
+  local skill_venv="$HOME/.claude/skills/wechat-daily-report/.venv/bin/python"
+  if [[ ! -x "$skill_venv" ]]; then
+    echo "❌ 没找到 skill venv: $skill_venv" >&2
+    echo "   先装: cd ~/.claude/skills/wechat-daily-report && python3 -m venv .venv && source .venv/bin/activate && pip install jieba jinja2 playwright && playwright install chromium" >&2
+    return 1
+  fi
+
+  local args=("$WECHAT_ROOT/bin/wf_report.py" "$talker")
+  [[ -n "$date_str" ]] && args+=(--date "$date_str")
+  [[ "$auto_sync" == "1" ]] && args+=(--auto-sync)
+  args+=(--secrets "$SECRETS")
+
+  "$skill_venv" "${args[@]}"
+}
+
+# === 入口 ===
+
+cmd="${1:-}"
+shift || true
+case "$cmd" in
+  health)   cmd_health "$@";;
+  sessions) cmd_sessions "$@";;
+  messages) cmd_messages "$@";;
+  members)  cmd_members "$@";;
+  moments)  cmd_moments "$@";;
+  sync)     cmd_sync "$@";;
+  wxsync)   cmd_wxsync "$@";;
+  report)   cmd_report "$@";;
+  raw)      cmd_raw "$@";;
+  ""|help|-h|--help)
+    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+  *) echo "未知命令: $cmd  (输入 wf 看帮助)" >&2; exit 1;;
+esac

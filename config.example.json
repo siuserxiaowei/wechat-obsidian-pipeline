@@ -1,0 +1,29 @@
+{
+  "_comment": "WeFlow API 集成配置 — 复制为 secrets.json 后填入真实 Token",
+  "endpoint": "http://127.0.0.1:5031",
+  "token": "REPLACE_WITH_TOKEN_FROM_WEFLOW_SETTINGS",
+  "vault_root": ".",
+  "export_root": "聊天记录导出",
+  "media_strategy": "link",
+  "_media_strategies": {
+    "link": "(推荐) media=1 时通过 _media/ 软链 WeFlow 的 api-media 目录, 不复制",
+    "copy": "复制媒体到每日目录(占额外磁盘, 但 vault 自包含)",
+    "url":  "Markdown 用 http://127.0.0.1:5031 引用(WeFlow 关掉就看不到)",
+    "none": "完全不处理媒体, 只渲染文本"
+  },
+  "default_query": {
+    "limit": 1000,
+    "include_media": true,
+    "image": true,
+    "voice": true,
+    "video": false,
+    "emoji": false
+  },
+  "render": {
+    "group_by": "day",
+    "show_avatar": false,
+    "show_message_id": false,
+    "collapse_emoji_burst": true,
+    "callout_links": true
+  }
+}

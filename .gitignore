@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 真实配置 (含 Token, 严禁提交)
+secrets.json
+*.local.json
+
+# 运行时缓存
+cache/
+.cache/
+
+# 日志
+logs/
+*.log
+
+# 媒体软链 / 临时
+_media/
+_inbox/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# 编辑器
+*.swp
+*.bak
+*~
