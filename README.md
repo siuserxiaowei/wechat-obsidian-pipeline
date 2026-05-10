@@ -4,6 +4,33 @@
 
 一套连接微信本地数据 ↔ Obsidian vault 的流水线工具. 支持两条独立的取数路径 ([wx-cli](https://github.com/jackwener/wx-cli) 和 [WeFlow](https://github.com/hicccc77/WeFlow)), 自动渲染成 Obsidian 友好的 Markdown 时间线, 并出每日 PNG 长图报告. 通过 macOS launchd 定时调度, 出来的报告 + AI 摘要直接归档到 vault, 可在 Obsidian 内全文搜索 / Dataview 查询 / 反链.
 
+## Hermes 本机只读版
+
+2026-05 新增一条更保守的路线：**Hermes / Codex 只读微信当前窗口，不托管主微信，不自动发消息。**
+
+这条路线适合只有一台主力机、一个主微信的人。它不追求“机器人替你回微信”，而是把 Hermes 当成一个桌面信息秘书：
+
+- 看你当前打开的微信窗口。
+- 总结哪些消息重要。
+- 帮你草拟回复。
+- 把链接、文件、会议纪要整理成 Obsidian 日程卡片。
+- 最终发送仍然由你手动完成。
+
+完整说明看这里：
+
+- [Hermes 本机只读微信 + Obsidian 日程卡片工作流](docs/hermes-readonly-obsidian-card.md)
+- [Obsidian 日程卡片模板](templates/obsidian_daily_card.md.j2)
+
+一句话区别：
+
+| 方案 | 跑在哪里 | 适合什么 |
+|---|---|---|
+| `wx-cli / WeFlow` | 本机 | 批量同步聊天记录、生成群日报 |
+| `Hermes 只读模式` | 本机 | 人在电脑前，让 AI 帮你看当前微信窗口 |
+| OpenClaw / VPS | 国外服务器 | 远程在线机器人、长期后台运行 |
+
+如果要读本机微信，核心还是本机。VPS 拿不到你 Mac 上的微信窗口，也拿不到本地数据库，除非你额外做远程桥接。
+
 ## 🎨 长图风格
 
 参考 [SimonLin 社群日报](https://simonlin000.github.io/qun-riba-20260430/) 的设计:
