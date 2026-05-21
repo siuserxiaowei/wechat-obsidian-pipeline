@@ -1,5 +1,18 @@
 # wechat-obsidian-pipeline
 
+<!-- SIUSER-SEO-INTRO:START -->
+
+## 项目介绍 / Project Introduction
+
+**中文介绍**：微信到 Obsidian 的信息沉淀流水线，把聊天、素材、日报和知识卡片整理进可复用知识库。
+
+**English**: A WeChat-to-Obsidian pipeline that turns chats, media, reports, and knowledge cards into a reusable personal knowledge base.
+
+**SEO 关键词 / SEO Keywords**: WeChat, Obsidian, PKM, knowledge management, AI summary, 知识管理
+
+<!-- SIUSER-SEO-INTRO:END -->
+
+
 > 把微信聊天记录自动接进 Obsidian vault, 每天早上 8 点出**社群日报长图**(Simon Lin 风格).
 
 一套连接微信本地数据 ↔ Obsidian vault 的流水线工具. 支持两条独立的取数路径 ([wx-cli](https://github.com/jackwener/wx-cli) 和 [WeFlow](https://github.com/hicccc77/WeFlow)), 自动渲染成 Obsidian 友好的 Markdown 时间线, 并出每日 PNG 长图报告. 通过 macOS launchd 定时调度, 出来的报告 + AI 摘要直接归档到 vault, 可在 Obsidian 内全文搜索 / Dataview 查询 / 反链.
@@ -305,3 +318,17 @@ launchctl kickstart "gui/$(id -u)/com.claudian.wechat-daily-report"
 ## 📄 许可
 
 MIT
+
+<!-- SIUSER-CONTACT:START -->
+
+## 联系我 / Contact
+
+想交流 AI 工具、内容自动化、SEO、私域增长或项目合作，可以扫码加我微信。
+
+For collaboration on AI tools, content automation, SEO, private-domain growth, or product experiments, scan the WeChat QR code below.
+
+<img src="https://raw.githubusercontent.com/siuserxiaowei/siuserxiaowei/main/assets/contact/wechat-qrcode.jpg" width="180" alt="WeChat QR code / 微信二维码" />
+
+**关键词 / Keywords**: WeChat, Obsidian, PKM, knowledge management, AI tools, AI automation, GitHub Pages, SEO
+
+<!-- SIUSER-CONTACT:END -->
